@@ -136,6 +136,59 @@ Configured:
 - CPU and memory resource limits.
 - PostgreSQL readiness probe.
 
+
+### Phase 5 — Flask and PostgreSQL Integration [Completed]
+
+Successfully integrated the Python Flask REST API with PostgreSQL running inside Kubernetes (K3s).
+
+**Implementation:**
+- Installed Psycopg 3 for PostgreSQL connectivity.
+- Replaced hardcoded customer records with database queries.
+- Connected Flask to PostgreSQL using Kubernetes port-forwarding.
+- Created a dedicated `customer_api` database account.
+- Configured least-privilege database permissions.
+- Used environment variables for database credentials.
+- Implemented parameterised SQL queries to reduce SQL injection risk.
+- Added database exception handling with generic HTTP 503 responses.
+
+**Security controls implemented:**
+
+| Control | Purpose |
+|---------|---------|
+| Restricted database role | Reduce database privileges |
+| Parameterised queries | Prevent SQL injection through query parameters |
+| Environment-based credentials | Avoid hardcoded database passwords |
+| Database error handling | Prevent internal errors being exposed to API clients |
+
+**Security assurance tests:**
+
+| Test | Result |
+|------|--------|
+| Application account authentication | Passed |
+| SELECT customer records | Allowed |
+| DELETE customer records | Denied |
+| Python-to-PostgreSQL connection | Successful |
+| GET /customers | HTTP 200 |
+| GET /customers/1 | HTTP 200 |
+| GET /customers/999 | HTTP 404 |
+
+**Security findings:**
+
+The `customer_api` account has SELECT and INSERT permissions on the customers table but cannot DELETE records.
+
+This reduces the potential impact of a compromised application identity. However, an attacker who compromises the Flask API may still be able to read customer information using the account's legitimate permissions.
+
+**Current limitations:**
+- Flask is still running directly on the Raspberry Pi.
+- PostgreSQL connectivity uses temporary port-forwarding.
+- API authentication and authorisation are not implemented.
+- Database network isolation is not yet enforced.
+- The application has not yet been containerised.
+
+**Next:** Containerise Flask, deploy it into K3s and introduce additional container and network security controls.
+
+
+
 **Verification results:**
 
 - PostgreSQL Pod: Running and Ready.
