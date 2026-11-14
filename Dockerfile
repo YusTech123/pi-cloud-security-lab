@@ -16,7 +16,9 @@ RUN apt-get update \
 # Install dependencies
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --no-cache-dir -r requirements.txt \
+    && python -m pip uninstall -y setuptools wheel \
+    && python -m pip check
 
 # Copy application
 COPY --chown=10001:10001 app/main.py ./main.py
