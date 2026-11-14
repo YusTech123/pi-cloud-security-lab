@@ -1,0 +1,23 @@
+# Git
+.git/
+.github/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Credentials
+.env
+.env.*
+*.pem
+*.key
+*.kubeconfig
+
+# Other project files not needed in the image
+db/
+k8s/
+README.md
+*.log

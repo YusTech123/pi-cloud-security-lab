@@ -1,0 +1,71 @@
+
+name: Container Build and Security Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  container-security:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Build ARM64 container image
+        run: |
+          docker build \
+            --platform linux/arm64 \
+            -t customer-api:ci .
+
+      - name: Verify image architecture
+        run: |
+          docker image inspect customer-api:ci \
+            --format '{{.Architecture}}'
+
+          test "$(docker image inspect customer-api:ci \
+            --format '{{.Architecture}}')" = "arm64"
+
+      - name: Verify non-root user
+        run: |
+          test "$(docker run --rm \
+            --network none \
+            --entrypoint id customer-api:ci -u)" = "10001"
+
+      - name: Start API container
+        run: |
+          docker run -d \
+            --name customer-api-smoke \
+            -p 127.0.0.1:18000:8000 \
+            customer-api:ci
+
+      - name: Test API health endpoint
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:18000/health; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          docker logs customer-api-smoke
+          exit 1
+
+      - name: Stop test container
+        if: always()
+        run: docker rm -f customer-api-smoke || true
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: customer-api:ci
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
