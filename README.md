@@ -151,6 +151,54 @@ Successfully integrated the Python Flask REST API with PostgreSQL running inside
 - Implemented parameterised SQL queries to reduce SQL injection risk.
 - Added database exception handling with generic HTTP 503 responses.
 
+
+### Phase 6 — Containerisation and CI Security [Completed]
+
+Containerised the Flask API using Docker and Gunicorn,
+targeting the ARM64 architecture.
+
+Implemented a GitHub Actions pipeline to automate:
+
+- ARM64 container image builds.
+- Container architecture verification.
+- Non-root execution verification (UID 10001).
+- Application health checks.
+- Container vulnerability scanning using Trivy.
+
+#### Vulnerability Detection and Remediation
+
+The initial pipeline detected two HIGH-severity
+vulnerabilities:
+
+| CVE | Package | Severity |
+|-----|---------|----------|
+| CVE-2026-23949 | jaraco.context | HIGH |
+| CVE-2026-24049 | wheel | HIGH |
+
+The security gate correctly failed the pipeline.
+
+Remediation involved removing unnecessary Python
+packaging tools (setuptools and wheel) from the
+runtime image after installing application dependencies.
+
+The subsequent pipeline passed all configured security
+checks and application health tests.
+
+#### Security Outcome
+
+- Reduced the container attack surface.
+- Verified non-root container execution.
+- Demonstrated automated vulnerability detection.
+- Validated remediation through rebuilding and rescanning.
+- Confirmed the security gate operates as intended.
+
+The image passed the configured vulnerability threshold.
+This does not guarantee the absence of all vulnerabilities.
+
+Next: Publish the verified image to GitHub Container
+Registry and deploy the API into Kubernetes.
+
+
 **Security controls implemented:**
 
 | Control | Purpose |
