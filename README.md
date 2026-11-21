@@ -378,34 +378,107 @@ The container health test verifies application startup, not end-to-end database 
 
 ---
 
-### Phase 7 — CI/CD and Container Registry
+
+### Phase 7 — Kubernetes Application Deployment
 
 **Status: Completed**
 
-Implemented an automated GitHub Actions pipeline to build, test, scan and publish the container image.
+Successfully deployed the containerised Flask REST API into the Raspberry Pi K3s Kubernetes cluster.
 
-The pipeline is separated into two jobs:
+#### Implementation
 
-1. `container-security`
-2. `publish-image`
+- Retrieved the verified ARM64 container image from GitHub Container Registry (GHCR).
+- Deployed the application using an immutable SHA256 image digest.
+- Created a Kubernetes Deployment and internal ClusterIP Service.
+- Configured a dedicated Kubernetes ServiceAccount.
+- Disabled automatic ServiceAccount token mounting.
+- Configured non-root container execution using UID 10001.
+- Disabled privilege escalation and dropped Linux capabilities.
+- Enabled the RuntimeDefault seccomp profile.
+- Configured CPU and memory resource limits.
+- Injected restricted PostgreSQL credentials through a Kubernetes Secret.
+- Configured readiness and liveness probes.
+- Connected the Flask API to PostgreSQL using internal Kubernetes networking.
 
-The publishing job depends on successful completion of the container security job.
+#### Functional Verification
 
-The verified image is transferred between jobs as an artifact rather than being rebuilt before publishing.
+| Test | Result |
+|---|---|
+| API health endpoint | HTTP 200 |
+| GET /customers | HTTP 200 |
+| GET /customers/1 | HTTP 200 |
+| GET /customers/999 | HTTP 404 |
+| PostgreSQL connectivity | Successful |
 
-#### Verification Results
+#### Security Verification
 
-- ARM64 container build successful.
-- Container security checks passed.
-- Verified image artifact created.
-- GitHub Container Registry authentication successful.
-- Container image published successfully.
+| Security Control | Evidence |
+|---|---|
+| Immutable container image | Deployment references SHA256 digest |
+| Non-root execution | UID 10001 verified using kubectl exec |
+| ServiceAccount token isolation | No Kubernetes API token mounted |
+| Database least privilege | API uses restricted customer_api identity |
+| Internal application networking | ClusterIP Service configured |
 
-The image is published using the Git commit SHA as its tag.
+#### Security Outcome
 
-**Next milestone:** Deploy the verified container image into Kubernetes using its immutable digest.
+The Flask REST API now runs inside Kubernetes alongside PostgreSQL.
+
+The application uses a dedicated workload identity, restricted database credentials and container security controls to reduce unnecessary privileges.
+
+The API is not intentionally exposed through a public Kubernetes Ingress or LoadBalancer.
+
+#### Residual Risk
+
+The customer endpoints currently lack application-level authentication and authorisation.
+
+Network isolation and container hardening reduce exposure but do not prevent unauthorised access by clients that can reach the API.
+
+API security will be addressed in the next implementation stage.
 
 ---
+
+
+### Phase 8 — Kubernetes Network Isolation
+
+**Status: Completed**
+
+Implemented Kubernetes NetworkPolicies to restrict network access to PostgreSQL.
+
+#### Security Objective
+
+Reduce lateral movement by preventing unrelated application workloads from connecting directly to the customer database.
+
+#### Implementation
+
+- Created a PostgreSQL ingress NetworkPolicy.
+- Restricted incoming TCP connections on port 5432.
+- Allowed connections from Pods labelled `app=customer-api`.
+- Denied connections from unrelated application Pods.
+- Retained access for the authorised Flask application.
+
+#### Security Validation
+
+| Test | Expected | Actual |
+|---|---|---|
+| Unauthorised Pod → PostgreSQL | Blocked | No response, exit code 2 |
+| Flask API → PostgreSQL | Allowed | HTTP 200, customer records returned |
+| NetworkPolicy configuration | Applied | Verified using kubectl describe |
+
+#### Security Outcome
+
+The NetworkPolicy successfully restricted PostgreSQL connectivity while allowing the authorised application to continue functioning.
+
+This demonstrates workload-level network segmentation and reduces the potential attack surface of the database.
+
+#### Residual Risk
+
+NetworkPolicies rely on Pod labels and do not provide user authentication or database authorisation.
+
+A compromised authorised application may still access the database using its legitimate permissions.
+
+Further hardening will include Kubernetes RBAC, workload identity restrictions and API authentication.
+
 
 ## CI/CD and Software Supply Chain
 
@@ -790,8 +863,8 @@ curl -i http://127.0.0.1:5000/customers/999
 - [x] Create and verify customer database schema.
 - [x] Integrate Flask with PostgreSQL.
 - [x] Containerise Flask using Docker and Gunicorn.
-- [ ] Deploy Flask container into Kubernetes.
-- [ ] Verify end-to-end Kubernetes application connectivity.
+- [x] Deploy Flask container into Kubernetes.
+- [x] Verify end-to-end Kubernetes application connectivity.
 
 ### Security Implementation
 
@@ -809,15 +882,19 @@ curl -i http://127.0.0.1:5000/customers/999
 - [x] Verify vulnerability remediation.
 - [x] Separate build and publishing permissions.
 - [x] Publish verified container image to GHCR.
-- [ ] Deploy application using an immutable image digest.
+- [x] Deploy application using an immutable image digest.
+- [x] Configure a dedicated Kubernetes ServiceAccount.
+- [x] Disable and verify unnecessary ServiceAccount token mounting.
+- [x] Implement PostgreSQL Kubernetes NetworkPolicy.
+- [x] Verify unauthorised Pod connectivity is blocked.
+- [x] Verify authorised Flask-to-PostgreSQL connectivity.
 - [ ] Enforce Restricted Pod Security Standards.
-- [ ] Implement Kubernetes NetworkPolicies.
-- [ ] Configure dedicated Kubernetes workload identities.
-- [ ] Disable unnecessary service account token mounting.
+- [ ] Implement default-deny network policies and API egress restrictions.
+- [ ] Review Kubernetes RBAC and workload identity permissions.
 - [ ] Implement API authentication and authorisation.
 - [ ] Implement additional API input validation.
 - [ ] Implement SAST, SCA and secrets scanning.
-- [ ] Harden the software supply chain.
+- [ ] Harden the software supply chain with action SHA pinning and image signing.
 - [ ] Implement runtime monitoring and detection.
 - [ ] Perform database backup and recovery testing.
 
@@ -828,6 +905,9 @@ curl -i http://127.0.0.1:5000/customers/999
 - [x] Verify container runtime identity.
 - [x] Verify vulnerability detection and remediation.
 - [x] Verify CI/CD security gate.
+- [x] Verify container registry publishing.
+- [x] Verify Kubernetes application deployment.
+- [x] Verify database network isolation.
 - [ ] Create detailed threat model covering five scenarios.
 - [ ] Diagram a complete attack path.
 - [ ] Perform realistic attack-path testing.

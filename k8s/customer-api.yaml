@@ -1,0 +1,108 @@
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: customer-api
+  namespace: devsecops-lab
+automountServiceAccountToken: false
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customer-api
+  namespace: devsecops-lab
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: customer-api
+
+  template:
+    metadata:
+      labels:
+        app: customer-api
+
+    spec:
+      serviceAccountName: customer-api
+      automountServiceAccountToken: false
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: customer-api
+          image: ghcr.io/yustech123/pi-cloud-security-lab@sha256:bd677eaf92f4f6e0f1af54f181da135d05c046acaffaefe05d69714311e7f5e1
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - containerPort: 8000
+
+          env:
+            - name: DB_HOST
+              value: postgres
+
+            - name: DB_PORT
+              value: "5432"
+
+            - name: DB_NAME
+              value: customerdb
+
+            - name: DB_USER
+              value: customer_api
+
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: customer-api-db
+                  key: DB_PASSWORD
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: customer-api
+  namespace: devsecops-lab
+spec:
+  type: ClusterIP
+
+  selector:
+    app: customer-api
+
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
